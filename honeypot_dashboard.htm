@@ -1,0 +1,1749 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HoneypotAI — Security Dashboard</title>
+<link rel="icon" type="image/x-icon" href="/logo.png">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500;600;700&family=Orbitron:wght@400;700;900&display=swap');
+
+  :root {
+    --bg: #020408;
+    --bg2: #060d14;
+    --bg3: #0a1520;
+    --panel: rgba(0,255,136,0.03);
+    --border: rgba(0,255,136,0.15);
+    --green: #00ff88;
+    --green2: #00cc6a;
+    --red: #ff3366;
+    --orange: #ff8c00;
+    --blue: #00aaff;
+    --cyan: #00ffff;
+    --text: #c8d8e8;
+    --text2: #6a8a9a;
+    --glow: 0 0 20px rgba(0,255,136,0.3);
+    --glow-red: 0 0 20px rgba(255,51,102,0.3);
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,255,136,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,136,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Scan line effect */
+  body::after {
+    content: '';
+    position: fixed;
+    top: -100%;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--green), transparent);
+    animation: scan 4s linear infinite;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.4;
+  }
+
+  @keyframes scan { to { top: 200%; } }
+
+  .app { position: relative; z-index: 2; }
+
+  /* HEADER */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 32px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(0,255,136,0.02);
+    backdrop-filter: blur(10px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-icon {
+    width: 40px;
+    height: 40px;
+    border: 1.5px solid var(--green);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    box-shadow: var(--glow);
+    animation: pulse-border 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-border {
+    0%,100% { box-shadow: var(--glow); }
+    50% { box-shadow: 0 0 30px rgba(0,255,136,0.6); }
+  }
+
+  .logo-text {
+    font-family: 'Orbitron', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--green);
+    letter-spacing: 2px;
+  }
+
+  .logo-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text2);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+
+  .header-status {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .status-dot {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text2);
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: blink 1.5s ease-in-out infinite;
+  }
+
+  .dot.red { background: var(--red); box-shadow: 0 0 8px var(--red); }
+  .dot.orange { background: var(--orange); box-shadow: 0 0 8px var(--orange); }
+
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .time-display {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    color: var(--green);
+    letter-spacing: 1px;
+  }
+
+  /* NAV TABS */
+  nav {
+    display: flex;
+    gap: 0;
+    padding: 0 32px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg2);
+  }
+
+  .tab {
+    padding: 14px 28px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--text2);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    border: none;
+    background: none;
+  }
+
+  .tab:hover { color: var(--text); }
+  .tab.active {
+    color: var(--green);
+    border-bottom: 2px solid var(--green);
+    background: rgba(0,255,136,0.05);
+  }
+
+  /* MAIN CONTENT */
+  main { padding: 28px 32px; }
+
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* CONFIG BAR */
+  .config-bar {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 24px;
+    padding: 16px 20px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+  }
+
+  .config-bar label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text2);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .config-bar select, .config-bar input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--green);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    padding: 8px 12px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  .btn {
+    padding: 9px 20px;
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+  }
+
+  .btn-green {
+    background: var(--green);
+    color: var(--bg);
+  }
+  .btn-green:hover { box-shadow: var(--glow); transform: translateY(-1px); }
+
+  .btn-outline {
+    background: transparent;
+    color: var(--green);
+    border: 1px solid var(--green);
+  }
+  .btn-outline:hover { background: rgba(0,255,136,0.1); }
+
+  .btn-red {
+    background: transparent;
+    color: var(--red);
+    border: 1px solid var(--red);
+  }
+  .btn-red:hover { background: rgba(255,51,102,0.1); }
+
+  /* STATS GRID */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .stat-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s;
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 3px;
+    height: 100%;
+    background: var(--green);
+  }
+
+  .stat-card.red::before { background: var(--red); }
+  .stat-card.orange::before { background: var(--orange); }
+  .stat-card.blue::before { background: var(--blue); }
+  .stat-card.cyan::before { background: var(--cyan); }
+
+  .stat-card:hover { border-color: rgba(0,255,136,0.4); transform: translateY(-2px); }
+
+  .stat-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text2);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .stat-value {
+    font-family: 'Orbitron', monospace;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--green);
+    line-height: 1;
+  }
+
+  .stat-card.red .stat-value { color: var(--red); }
+  .stat-card.orange .stat-value { color: var(--orange); }
+  .stat-card.blue .stat-value { color: var(--blue); }
+  .stat-card.cyan .stat-value { color: var(--cyan); }
+
+  .stat-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text2);
+    margin-top: 6px;
+  }
+
+  /* PANELS GRID */
+  .panels-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+
+  .panels-grid-3 {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(0,255,136,0.03);
+  }
+
+  .panel-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--green);
+  }
+
+  .panel-badge {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    padding: 3px 8px;
+    background: rgba(0,255,136,0.1);
+    color: var(--green);
+    border: 1px solid rgba(0,255,136,0.2);
+  }
+
+  .panel-body { padding: 16px; }
+
+  /* TABLE */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+  }
+
+  .data-table th {
+    text-align: left;
+    padding: 8px 10px;
+    color: var(--text2);
+    letter-spacing: 1px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 400;
+  }
+
+  .data-table td {
+    padding: 9px 10px;
+    color: var(--text);
+    border-bottom: 1px solid rgba(0,255,136,0.05);
+  }
+
+  .data-table tr:hover td { background: rgba(0,255,136,0.03); }
+
+  .badge-green { color: var(--green); }
+  .badge-red { color: var(--red); }
+  .badge-orange { color: var(--orange); }
+  .badge-blue { color: var(--blue); }
+
+  /* LIVE LOG */
+  .live-log {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    height: 220px;
+    overflow-y: auto;
+    padding: 12px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    line-height: 1.8;
+  }
+
+  .log-line { display: flex; gap: 12px; }
+  .log-time { color: var(--text2); min-width: 85px; }
+  .log-level-info { color: var(--green); }
+  .log-level-warn { color: var(--orange); }
+  .log-level-alert { color: var(--red); }
+  .log-msg { color: var(--text); }
+
+  /* REPORT PAGE */
+  .report-controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+
+  .report-output {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    padding: 24px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    line-height: 1.8;
+    white-space: pre-wrap;
+    max-height: 600px;
+    overflow-y: auto;
+    color: var(--text);
+    min-height: 200px;
+  }
+
+  .report-output .r-header { color: var(--green); font-weight: bold; }
+  .report-output .r-section { color: var(--cyan); }
+  .report-output .r-value { color: var(--orange); }
+  .report-output .r-alert { color: var(--red); }
+
+  /* LOADING */
+  .loading {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: var(--green);
+  }
+
+  .loading.show { display: flex; }
+
+  .spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(0,255,136,0.2);
+    border-top-color: var(--green);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* BAR CHART */
+  .bar-chart { display: flex; flex-direction: column; gap: 8px; }
+
+  .bar-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+  }
+
+  .bar-label { color: var(--text2); min-width: 120px; text-align: right; font-size: 10px; }
+  .bar-track { flex: 1; background: rgba(0,255,136,0.05); height: 18px; position: relative; }
+  .bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green2), var(--green));
+    transition: width 1s ease;
+    position: relative;
+  }
+  .bar-fill::after {
+    content: attr(data-val);
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 10px;
+    color: var(--bg);
+    font-weight: bold;
+  }
+
+  .bar-fill.red { background: linear-gradient(90deg, #cc1144, var(--red)); }
+  .bar-fill.orange { background: linear-gradient(90deg, #cc6600, var(--orange)); }
+  .bar-fill.blue { background: linear-gradient(90deg, #0066cc, var(--blue)); }
+
+  /* IP MAP */
+  .ip-list { display: flex; flex-direction: column; gap: 6px; }
+
+  .ip-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: rgba(0,255,136,0.03);
+    border: 1px solid rgba(0,255,136,0.08);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    transition: all 0.2s;
+  }
+
+  .ip-item:hover { border-color: var(--border); background: rgba(0,255,136,0.06); }
+  .ip-addr { color: var(--green); }
+  .ip-count { color: var(--orange); }
+  .ip-bar { width: 80px; height: 4px; background: rgba(0,255,136,0.1); }
+  .ip-bar-fill { height: 100%; background: var(--orange); transition: width 1s; }
+
+  /* ES CONFIG */
+  .es-config {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    margin-bottom: 20px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+  }
+
+  .es-config label { color: var(--text2); }
+  .es-config input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--green);
+    padding: 6px 10px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    outline: none;
+    width: 220px;
+  }
+
+  /* ALERT BANNER */
+  .alert-banner {
+    padding: 10px 16px;
+    border-left: 3px solid var(--red);
+    background: rgba(255,51,102,0.05);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--red);
+    margin-bottom: 16px;
+    display: none;
+  }
+
+  .alert-banner.show { display: block; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--green2); }
+
+  /* EMPTY STATE */
+  .empty {
+    text-align: center;
+    padding: 40px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: var(--text2);
+  }
+
+  .mitre-tag {
+    display: inline-block;
+    padding: 2px 6px;
+    background: rgba(0,170,255,0.1);
+    border: 1px solid rgba(0,170,255,0.3);
+    color: var(--blue);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    margin: 2px;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <img class="logo-icon" src="/logo.png" />
+    <div>
+      <div class="logo-text">HONEYPOT<span style="color:#fff;font-weight:300">AI</span></div>
+      <div class="logo-sub">Security Operations Center</div>
+    </div>
+  </div>
+  <div class="header-status">
+    <div class="status-dot"><div class="dot"></div> COWRIE ACTIVE</div>
+    <div class="status-dot"><div class="dot orange"></div> DIONAEA ACTIVE</div>
+    <div class="status-dot"><div class="dot red" id="alert-dot" style="display:none"></div> <span id="alert-text" style="display:none">ALERT</span></div>
+    <div class="time-display" id="clock">--:--:--</div>
+  </div>
+</header>
+
+<!-- NAV -->
+<nav>
+  <button class="tab active" onclick="showPage('dashboard', this)">◈ Dashboard</button>
+  <button class="tab" onclick="showPage('attacks', this)">⚡ Attaques</button>
+  <button class="tab" onclick="showPage('commands', this)">$ Commandes</button>
+  <button class="tab" onclick="showPage('cnn', this)">🧠 CNN Detect</button>
+  <button class="tab" onclick="showPage('report', this)">📋 Rapport AI</button>
+</nav>
+
+<main>
+
+<!-- ES CONFIG (always visible) -->
+<div class="es-config">
+  <label>ELASTICSEARCH:</label>
+  <input type="text" id="es-host" value="http://localhost:9200" placeholder="http://localhost:9200" />
+  <label>PÉRIODE:</label>
+  <select id="hours-select" style="background:var(--bg);border:1px solid var(--border);color:var(--green);padding:6px 10px;font-family:'Share Tech Mono',monospace;font-size:11px;outline:none;">
+    <option value="1">1h</option>
+    <option value="24" selected>24h</option>
+    <option value="72">72h</option>
+    <option value="168">7 jours</option>
+  </select>
+  <button class="btn btn-green" onclick="loadAll()">▶ CHARGER</button>
+  <div class="loading" id="main-loading"><div class="spinner"></div> Chargement...</div>
+</div>
+
+<div class="alert-banner" id="alert-banner">
+  ⚠ ALERTE: Activité suspecte détectée — Vérifier immédiatement
+</div>
+<!-- END ES CONFIG ============---->
+ <!-- ══════════════════ CNN DETECT ══════════════════ -->
+<div class="page" id="page-cnn">
+
+  <div class="config-bar">
+    <label>FLASK API:</label>
+    <input type="text" id="flask-url" value="http://127.0.0.1:5005" style="width:240px"/>
+    <button class="btn btn-green" onclick="testFlask()">▶ TEST</button>
+    <button class="btn btn-outline" onclick="runCNN()">🧠 ANALYSER</button>
+    <button class="btn btn-red" onclick="clearCNN()">✕ RESET</button>
+    <div class="loading" id="cnn-loading"><div class="spinner"></div> Analyse CNN...</div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card red">
+      <div class="stat-label">Attaques Détectées</div>
+      <div class="stat-value" id="cnn-stat-att">—</div>
+      <div class="stat-sub">Score CNN &gt; 50%</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Trafic Normal</div>
+      <div class="stat-value" id="cnn-stat-norm">—</div>
+      <div class="stat-sub">Score CNN ≤ 50%</div>
+    </div>
+    <div class="stat-card orange">
+      <div class="stat-label">Score Moyen</div>
+      <div class="stat-value" id="cnn-stat-avg">—</div>
+      <div class="stat-sub">Niveau global</div>
+    </div>
+    <div class="stat-card blue">
+      <div class="stat-label">Sessions Analysées</div>
+      <div class="stat-value" id="cnn-stat-total">—</div>
+      <div class="stat-sub">Par le CNN 1D</div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-bottom:16px">
+    <div class="panel-header">
+      <span class="panel-title">Résultats CNN 1D — Sessions Cowrie</span>
+      <span class="panel-badge" id="cnn-badge">EN ATTENTE</span>
+    </div>
+    <div class="panel-body" style="padding:0">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>IP SOURCE</th>
+            <th>DURÉE</th>
+            <th>TENTATIVES</th>
+            <th>COMMANDES</th>
+            <th>SCORE CNN</th>
+            <th>NIVEAU</th>
+            <th>LABEL</th>
+          </tr>
+        </thead>
+        <tbody id="cnn-table">
+          <tr><td colspan="7" class="empty">Charger ES puis cliquer ANALYSER</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Test Manuel</span>
+      <span class="panel-badge">CNN 1D</span>
+    </div>
+    <div class="panel-body">
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px">
+        <div>
+          <div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text2);margin-bottom:4px">LOGIN ATTEMPTS</div>
+          <input id="m-attempts" type="number" value="50" style="background:var(--bg);border:1px solid var(--border);color:var(--green);padding:8px;font-family:'Share Tech Mono',monospace;font-size:12px;width:130px;outline:none"/>
+        </div>
+        <div>
+          <div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text2);margin-bottom:4px">LOGIN SUCCESS</div>
+          <input id="m-success" type="number" value="0" style="background:var(--bg);border:1px solid var(--border);color:var(--green);padding:8px;font-family:'Share Tech Mono',monospace;font-size:12px;width:130px;outline:none"/>
+        </div>
+        <div>
+          <div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text2);margin-bottom:4px">COMMANDES</div>
+          <input id="m-cmds" type="number" value="0" style="background:var(--bg);border:1px solid var(--border);color:var(--green);padding:8px;font-family:'Share Tech Mono',monospace;font-size:12px;width:130px;outline:none"/>
+        </div>
+        <div>
+          <div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text2);margin-bottom:4px">DURÉE (sec)</div>
+          <input id="m-duration" type="number" value="30" style="background:var(--bg);border:1px solid var(--border);color:var(--green);padding:8px;font-family:'Share Tech Mono',monospace;font-size:12px;width:130px;outline:none"/>
+        </div>
+        <button class="btn btn-green" onclick="testManual()">PRÉDIRE</button>
+      </div>
+      <div id="manual-result" style="font-family:'Share Tech Mono',monospace;font-size:13px;color:var(--text2);padding:12px;border:1px solid var(--border);background:var(--bg)">
+        Remplir les champs et cliquer PRÉDIRE
+      </div>
+    </div>
+  </div>
+</div>
+<!-- ═══════════════════════════════ DASHBOARD ═══════════════════════════════ -->
+<div class="page active" id="page-dashboard">
+
+  <!-- Stats -->
+  <div class="stats-grid" id="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Connexions SSH</div>
+      <div class="stat-value" id="stat-conn">—</div>
+      <div class="stat-sub">Cowrie honeypot</div>
+    </div>
+    <div class="stat-card red">
+      <div class="stat-label">Login Réussis</div>
+      <div class="stat-value" id="stat-ok">—</div>
+      <div class="stat-sub">Accès obtenus</div>
+    </div>
+    <div class="stat-card orange">
+      <div class="stat-label">Login Échoués</div>
+      <div class="stat-value" id="stat-ko">—</div>
+      <div class="stat-sub">Brute force</div>
+    </div>
+    <div class="stat-card blue">
+      <div class="stat-label">Commandes</div>
+      <div class="stat-value" id="stat-cmd">—</div>
+      <div class="stat-sub">Post-exploitation</div>
+    </div>
+    <div class="stat-card cyan">
+      <div class="stat-label">Dionaea Hits</div>
+      <div class="stat-value" id="stat-dionaea">—</div>
+      <div class="stat-sub">FTP/SMB/MSSQL</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">IPs Uniques</div>
+      <div class="stat-value" id="stat-ips">—</div>
+      <div class="stat-sub">Attackers distincts</div>
+    </div>
+  </div>
+
+  <div class="panels-grid">
+    <!-- Protocoles Dionaea -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Protocoles Dionaea</span>
+        <span class="panel-badge" id="badge-proto">—</span>
+      </div>
+      <div class="panel-body">
+        <div class="bar-chart" id="proto-chart">
+          <div class="empty">Charger les données...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top IPs -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Top Attackers</span>
+        <span class="panel-badge" id="badge-ips">—</span>
+      </div>
+      <div class="panel-body">
+        <div class="ip-list" id="ip-list">
+          <div class="empty">Charger les données...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Live Log -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Live Event Stream</span>
+      <span class="panel-badge" id="badge-live">LIVE</span>
+    </div>
+    <div class="live-log" id="live-log">
+      <div class="log-line">
+        <span class="log-time">--:--:--</span>
+        <span class="log-level-info">[INFO]</span>
+        <span class="log-msg">En attente de données Elasticsearch...</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ ATTACKS ═══════════════════════════════ -->
+<div class="page" id="page-attacks">
+  <div class="panels-grid">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Tentatives Login</span>
+        <span class="panel-badge" id="badge-logins">—</span>
+      </div>
+      <div class="panel-body">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>TIMESTAMP</th>
+              <th>IP SOURCE</th>
+              <th>USER</th>
+              <th>PASSWORD</th>
+              <th>STATUS</th>
+            </tr>
+          </thead>
+          <tbody id="logins-table">
+            <tr><td colspan="5" class="empty">Charger...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Top Passwords Essayés</span>
+      </div>
+      <div class="panel-body">
+        <div class="bar-chart" id="pass-chart">
+          <div class="empty">Charger les données...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">Connexions Dionaea</span>
+      <span class="panel-badge" id="badge-dion">—</span>
+    </div>
+    <div class="panel-body">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>TIMESTAMP</th>
+            <th>PROTOCOLE</th>
+            <th>MESSAGE</th>
+          </tr>
+        </thead>
+        <tbody id="dionaea-table">
+          <tr><td colspan="3" class="empty">Charger...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ COMMANDS ═══════════════════════════════ -->
+<div class="page" id="page-commands">
+  <div class="panels-grid">
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Commandes Détectées</span>
+        <span class="panel-badge" id="badge-cmds">—</span>
+      </div>
+      <div class="panel-body">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>TIMESTAMP</th>
+              <th>IP SOURCE</th>
+              <th>COMMANDE</th>
+              <th>RISK</th>
+            </tr>
+          </thead>
+          <tbody id="cmds-table">
+            <tr><td colspan="4" class="empty">Charger...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Top Commandes</span>
+      </div>
+      <div class="panel-body">
+        <div class="bar-chart" id="cmd-freq-chart">
+          <div class="empty">Charger les données...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MITRE ATT&CK -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">MITRE ATT&CK — Techniques Détectées</span>
+    </div>
+    <div class="panel-body" id="mitre-panel">
+      <div class="empty">Analyser les commandes d'abord...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ RAPPORT ═══════════════════════════════ -->
+<div class="page" id="page-report">
+  <div class="report-controls">
+    <label style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text2);">GROQ API KEY:</label>
+    <input type="password" id="groq-key" placeholder="gsk_..." style="background:var(--bg);border:1px solid var(--border);color:var(--green);padding:8px 12px;font-family:'Share Tech Mono',monospace;font-size:11px;outline:none;width:300px;" />
+    <button class="btn btn-green" onclick="generateReport()">🤖 GÉNÉRER RAPPORT AI</button>
+    <button class="btn btn-outline" onclick="downloadReport()">⬇ TÉLÉCHARGER</button>
+    <button class="btn btn-red" onclick="clearReport()">✕ EFFACER</button>
+    <div class="loading" id="report-loading"><div class="spinner"></div> Analyse en cours...</div>
+  </div>
+
+  <div class="report-output" id="report-output">
+╔══════════════════════════════════════════════════════════════╗
+║           HoneypotAI — Rapport de Sécurité                  ║
+║           Propulsé par Groq LLaMA 3.3 70B                   ║
+╚══════════════════════════════════════════════════════════════╝
+
+1. Charger les données Elasticsearch (bouton CHARGER)
+2. Entrer votre clé Groq API
+3. Cliquer sur "GÉNÉRER RAPPORT AI"
+
+Le rapport analysera automatiquement:
+  • Profil des attaquants
+  • Techniques MITRE ATT&CK
+  • Niveau de menace
+  • Recommandations de défense
+  </div>
+</div>
+
+</main>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
+let state = {
+  cowrie: { connections:[], login_success:[], login_failed:[], commands:[], ips:new Set(), usernames:new Set(), passwords:new Set() },
+  dionaea: { connections:[], protocols:{} },
+  rawLogs: []
+};
+
+let reportText = '';
+
+// ═══════════════════════════════════════════════
+// CLOCK
+// ═══════════════════════════════════════════════
+function updateClock() {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString('fr-FR');
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ═══════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ═══════════════════════════════════════════════
+// ELASTICSEARCH
+// ═══════════════════════════════════════════════
+async function queryES(hours) {
+  const host = document.getElementById('es-host').value;
+  const cutoff = new Date(Date.now() - hours * 3600000).toISOString();
+  const query = {
+    size: 1000,
+    sort: [{"@timestamp": {"order": "desc"}}],
+    query: { range: { "@timestamp": { gte: cutoff } } }
+  };
+
+  const resp = await fetch(`${host}/filebeat-*/_search`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(query)
+  });
+
+  if (!resp.ok) throw new Error(`ES Error: ${resp.status}`);
+  const data = await resp.json();
+  return data.hits?.hits?.map(h => h._source) || [];
+}
+
+// ═══════════════════════════════════════════════
+// PARSE LOGS
+// ═══════════════════════════════════════════════
+function parseLogs(logs) {
+  const cowrie = { connections:[], login_success:[], login_failed:[], commands:[], ips:new Set(), usernames:new Set(), passwords:new Set() };
+  const dionaea = { connections:[], protocols:{} };
+
+  for (const log of logs) {
+    const tags = log.tags || [];
+    const honeypot = log.fields?.honeypot || '';
+    const eventid = log.eventid || '';
+
+    if (tags.includes('cowrie') || honeypot === 'cowrie') {
+      const ip = log.src_ip || '';
+      if (ip) cowrie.ips.add(ip);
+
+      if (eventid.includes('session.connect')) cowrie.connections.push(log);
+      else if (eventid.includes('login.success')) {
+        cowrie.login_success.push(log);
+        if (log.username) cowrie.usernames.add(log.username);
+        if (log.password) cowrie.passwords.add(log.password);
+      }
+      else if (eventid.includes('login.failed')) {
+        cowrie.login_failed.push(log);
+        if (log.username) cowrie.usernames.add(log.username);
+        if (log.password) cowrie.passwords.add(log.password);
+      }
+      else if (eventid.includes('command.input')) {
+        const msg = log.message || '';
+        const cmd = msg.replace('CMD: ', '').trim();
+        if (cmd) cowrie.commands.push({ input: cmd, src_ip: ip, timestamp: log['@timestamp'] });
+      }
+    }
+    else if (tags.includes('dionaea') || honeypot === 'dionaea') {
+      const msg = (log.message || '').toLowerCase();
+      dionaea.connections.push(log);
+      for (const p of ['smb','ftp','mssql','mysql','http','mqtt','upnp']) {
+        if (msg.includes(p)) {
+          dionaea.protocols[p.toUpperCase()] = (dionaea.protocols[p.toUpperCase()] || 0) + 1;
+        }
+      }
+    }
+  }
+
+  cowrie.ips = [...cowrie.ips];
+  cowrie.usernames = [...cowrie.usernames].filter(Boolean);
+  cowrie.passwords = [...cowrie.passwords].filter(Boolean);
+  return { cowrie, dionaea };
+}
+
+// ═══════════════════════════════════════════════
+// LOAD ALL
+// ═══════════════════════════════════════════════
+async function loadAll() {
+  const hours = parseInt(document.getElementById('hours-select').value);
+  document.getElementById('main-loading').classList.add('show');
+
+  try {
+    const logs = await queryES(hours);
+    state.rawLogs = logs;
+    const parsed = parseLogs(logs);
+    state.cowrie = parsed.cowrie;
+    state.dionaea = parsed.dionaea;
+
+    updateDashboard();
+    updateAttacks();
+    updateCommands();
+    addLiveLogs(logs.slice(0, 30));
+
+    // Alert si trop de login success
+    if (state.cowrie.login_success.length > 10) {
+      document.getElementById('alert-banner').classList.add('show');
+      document.getElementById('alert-dot').style.display = 'block';
+      document.getElementById('alert-text').style.display = 'block';
+    }
+
+  } catch(e) {
+    addLiveLog('error', `Erreur connexion ES: ${e.message}`);
+    alert(`Erreur: ${e.message}\n\nVérifier:\n1. Elasticsearch démarré\n2. URL correcte\n3. CORS activé`);
+  }
+
+  document.getElementById('main-loading').classList.remove('show');
+}
+
+// ═══════════════════════════════════════════════
+// UPDATE DASHBOARD
+// ═══════════════════════════════════════════════
+function updateDashboard() {
+  const c = state.cowrie;
+  const d = state.dionaea;
+
+  document.getElementById('stat-conn').textContent = c.connections.length;
+  document.getElementById('stat-ok').textContent = c.login_success.length;
+  document.getElementById('stat-ko').textContent = c.login_failed.length;
+  document.getElementById('stat-cmd').textContent = c.commands.length;
+  document.getElementById('stat-dionaea').textContent = d.connections.length;
+  document.getElementById('stat-ips').textContent = c.ips.length;
+
+  // Protocoles chart
+  const protos = d.protocols;
+  const protoTotal = Object.values(protos).reduce((a,b) => a+b, 0);
+  document.getElementById('badge-proto').textContent = Object.keys(protos).length + ' protocoles';
+  const colors = ['', 'red', 'orange', 'blue', 'cyan', ''];
+  const protoHtml = Object.entries(protos)
+    .sort((a,b) => b[1]-a[1])
+    .map(([k,v], i) => `
+      <div class="bar-row">
+        <div class="bar-label">${k}</div>
+        <div class="bar-track">
+          <div class="bar-fill ${colors[i]||''}" style="width:${protoTotal?Math.round(v/protoTotal*100):0}%" data-val="${v}"></div>
+        </div>
+      </div>
+    `).join('');
+  document.getElementById('proto-chart').innerHTML = protoHtml || '<div class="empty">Aucun</div>';
+
+  // IP list
+  const ipCount = {};
+  [...c.login_success, ...c.login_failed].forEach(l => {
+    if (l.src_ip) ipCount[l.src_ip] = (ipCount[l.src_ip]||0) + 1;
+  });
+  const maxIp = Math.max(...Object.values(ipCount), 1);
+  document.getElementById('badge-ips').textContent = c.ips.length + ' IPs';
+  const ipHtml = Object.entries(ipCount)
+    .sort((a,b) => b[1]-a[1])
+    .slice(0,8)
+    .map(([ip, cnt]) => `
+      <div class="ip-item">
+        <span class="ip-addr">${ip}</span>
+        <div class="ip-bar"><div class="ip-bar-fill" style="width:${Math.round(cnt/maxIp*100)}%"></div></div>
+        <span class="ip-count">${cnt} hits</span>
+      </div>
+    `).join('');
+  document.getElementById('ip-list').innerHTML = ipHtml || '<div class="empty">Aucune</div>';
+}
+
+// ═══════════════════════════════════════════════
+// UPDATE ATTACKS
+// ═══════════════════════════════════════════════
+function updateAttacks() {
+  const c = state.cowrie;
+  const d = state.dionaea;
+
+  // Logins table
+  const allLogins = [
+    ...c.login_success.map(l => ({...l, status:'success'})),
+    ...c.login_failed.map(l => ({...l, status:'failed'}))
+  ].sort((a,b) => new Date(b['@timestamp']||0) - new Date(a['@timestamp']||0)).slice(0,30);
+
+  document.getElementById('badge-logins').textContent = allLogins.length;
+  document.getElementById('logins-table').innerHTML = allLogins.map(l => `
+    <tr>
+      <td style="color:var(--text2)">${formatTime(l['@timestamp'])}</td>
+      <td class="badge-blue">${l.src_ip||'—'}</td>
+      <td class="badge-orange">${l.username||'—'}</td>
+      <td style="color:var(--text)">${l.password||'—'}</td>
+      <td class="${l.status==='success'?'badge-red':'badge-green'}">${l.status==='success'?'✓ SUCCESS':'✗ FAILED'}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="5" class="empty">Aucun</td></tr>';
+
+  // Passwords chart
+  const passCount = {};
+  c.passwords.forEach(p => { passCount[p] = (passCount[p]||0) + 1; });
+  const sortedPass = Object.entries(passCount).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const maxPass = sortedPass[0]?.[1] || 1;
+  document.getElementById('pass-chart').innerHTML = sortedPass.map(([p,v]) => `
+    <div class="bar-row">
+      <div class="bar-label">${p}</div>
+      <div class="bar-track">
+        <div class="bar-fill orange" style="width:${Math.round(v/maxPass*100)}%" data-val="${v}"></div>
+      </div>
+    </div>
+  `).join('') || '<div class="empty">Aucun</div>';
+
+  // Dionaea table
+  document.getElementById('badge-dion').textContent = d.connections.length;
+  document.getElementById('dionaea-table').innerHTML = d.connections.slice(0,20).map(l => {
+    const msg = l.message || '';
+    const proto = ['SMB','FTP','MSSQL','MySQL','HTTP'].find(p => msg.toUpperCase().includes(p)) || '—';
+    return `
+      <tr>
+        <td style="color:var(--text2)">${formatTime(l['@timestamp'])}</td>
+        <td class="badge-cyan">${proto}</td>
+        <td style="color:var(--text);font-size:10px">${msg.substring(0,80)}...</td>
+      </tr>
+    `;
+  }).join('') || '<tr><td colspan="3" class="empty">Aucun</td></tr>';
+}
+
+// ═══════════════════════════════════════════════
+// UPDATE COMMANDS
+// ═══════════════════════════════════════════════
+function updateCommands() {
+  const cmds = state.cowrie.commands;
+  document.getElementById('badge-cmds').textContent = cmds.length;
+
+  // Risk assessment
+  const highRisk = ['rm -rf','wget','curl','chmod','nc ','bash -i','python -c','/dev/tcp','mkfifo','base64'];
+  const medRisk = ['nmap','passwd','shadow','crontab','systemctl','docker','sudo','su '];
+
+  document.getElementById('cmds-table').innerHTML = cmds.slice(0,30).map(c => {
+    const risk = highRisk.some(r => c.input.includes(r)) ? 'HIGH' :
+                 medRisk.some(r => c.input.includes(r)) ? 'MED' : 'LOW';
+    const riskColor = risk==='HIGH'?'badge-red':risk==='MED'?'badge-orange':'badge-green';
+    return `
+      <tr>
+        <td style="color:var(--text2)">${formatTime(c.timestamp)}</td>
+        <td class="badge-blue">${c.src_ip||'—'}</td>
+        <td style="color:var(--green);font-family:'Share Tech Mono',monospace">${c.input}</td>
+        <td class="${riskColor}">${risk}</td>
+      </tr>
+    `;
+  }).join('') || '<tr><td colspan="4" class="empty">Aucune commande</td></tr>';
+
+  // Freq chart
+  const freqMap = {};
+  cmds.forEach(c => { freqMap[c.input] = (freqMap[c.input]||0)+1; });
+  const sorted = Object.entries(freqMap).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const maxF = sorted[0]?.[1]||1;
+  document.getElementById('cmd-freq-chart').innerHTML = sorted.map(([cmd,v]) => `
+    <div class="bar-row">
+      <div class="bar-label" title="${cmd}">${cmd.substring(0,18)}</div>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:${Math.round(v/maxF*100)}%" data-val="${v}x"></div>
+      </div>
+    </div>
+  `).join('') || '<div class="empty">Aucune</div>';
+
+  // MITRE
+  updateMitre(cmds);
+}
+
+function updateMitre(cmds) {
+  const techniques = [];
+  const cmdStr = cmds.map(c=>c.input).join(' ');
+
+  if (cmdStr.match(/nmap|scan|ping/)) techniques.push({id:'T1046', name:'Network Service Discovery'});
+  if (cmdStr.match(/passwd|shadow|cat \/etc/)) techniques.push({id:'T1003', name:'OS Credential Dumping'});
+  if (cmdStr.match(/wget|curl|download/)) techniques.push({id:'T1105', name:'Ingress Tool Transfer'});
+  if (cmdStr.match(/chmod|sudo|su /)) techniques.push({id:'T1548', name:'Abuse Elevation Control'});
+  if (cmdStr.match(/crontab|systemctl|rc\.local/)) techniques.push({id:'T1053', name:'Scheduled Task/Job'});
+  if (cmdStr.match(/bash -i|nc |\/dev\/tcp|mkfifo/)) techniques.push({id:'T1059', name:'Command & Scripting Interpreter'});
+  if (cmdStr.match(/rm -rf|shred|wipe/)) techniques.push({id:'T1485', name:'Data Destruction'});
+  if (cmdStr.match(/ps|top|netstat|ifconfig/)) techniques.push({id:'T1082', name:'System Information Discovery'});
+  if (cmdStr.match(/docker|kubectl/)) techniques.push({id:'T1610', name:'Deploy Container'});
+  if (cmdStr.match(/mysql|psql|mongo/)) techniques.push({id:'T1190', name:'Exploit Public-Facing App'});
+
+  // Brute force always applies
+  if (state.cowrie.login_failed.length > 0) techniques.push({id:'T1110', name:'Brute Force'});
+
+  const html = techniques.length ?
+    `<div style="margin-bottom:12px;font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text2);">
+      ${techniques.length} technique(s) MITRE ATT&CK identifiée(s):
+    </div>
+    <div>${techniques.map(t => `
+      <span class="mitre-tag">${t.id}</span>
+      <span style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--text);margin-right:16px;">${t.name}</span>
+    `).join('')}</div>` :
+    '<div class="empty">Charger les commandes d\'abord</div>';
+
+  document.getElementById('mitre-panel').innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════
+// LIVE LOG
+// ═══════════════════════════════════════════════
+function addLiveLogs(logs) {
+  const el = document.getElementById('live-log');
+  el.innerHTML = '';
+  logs.forEach(log => {
+    const eid = log.eventid || log.message || '—';
+    const ip = log.src_ip || '';
+    const level = eid.includes('success') ? 'alert' : eid.includes('command') ? 'warn' : 'info';
+    const line = document.createElement('div');
+    line.className = 'log-line';
+    line.innerHTML = `
+      <span class="log-time">${formatTime(log['@timestamp'])}</span>
+      <span class="log-level-${level}">[${level.toUpperCase()}]</span>
+      <span class="log-msg">${ip ? ip + ' — ' : ''}${eid.substring(0,60)}</span>
+    `;
+    el.appendChild(line);
+  });
+}
+
+function addLiveLog(level, msg) {
+  const el = document.getElementById('live-log');
+  const line = document.createElement('div');
+  line.className = 'log-line';
+  line.innerHTML = `
+    <span class="log-time">${new Date().toLocaleTimeString('fr-FR')}</span>
+    <span class="log-level-${level}">[${level.toUpperCase()}]</span>
+    <span class="log-msg">${msg}</span>
+  `;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+
+// ═══════════════════════════════════════════════
+// GENERATE REPORT
+// ═══════════════════════════════════════════════
+async function generateReport() {
+  const apiKey = document.getElementById('groq-key').value.trim();
+  if (!apiKey) { alert('Entrer votre clé Groq API!'); return; }
+  if (!state.rawLogs.length) { alert('Charger les données d\'abord!'); return; }
+
+  document.getElementById('report-loading').classList.add('show');
+  document.getElementById('report-output').textContent = 'Analyse en cours...';
+
+  const c = state.cowrie;
+  const d = state.dionaea;
+  const hours = document.getElementById('hours-select').value;
+
+  const prompt = `Tu es un expert SOC niveau 3. Analyse ces données honeypot sur ${hours}h:
+
+COWRIE SSH:
+- Connexions: ${c.connections.length}
+- Login réussis: ${c.login_success.length}
+- Login échoués: ${c.login_failed.length}
+- Commandes: ${c.commands.length}
+- IPs: ${c.ips.slice(0,10).join(', ')}
+- Usernames: ${c.usernames.slice(0,10).join(', ')}
+- Passwords: ${c.passwords.slice(0,10).join(', ')}
+- Commandes list: ${c.commands.slice(0,20).map(x=>x.input).join(', ')}
+
+DIONAEA:
+- Connexions: ${d.connections.length}
+- Protocoles: ${JSON.stringify(d.protocols)}
+
+Fournis un rapport complet:
+1. PROFIL ATTAQUANT (type, sophistication)
+2. MITRE ATT&CK (codes T-XXXX)
+3. OBJECTIF PROBABLE
+4. NIVEAU MENACE (X/10)
+5. COMPORTEMENT DÉTAILLÉ
+6. RECOMMANDATIONS
+
+Style: rapport SOC professionnel en français.`;
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2000,
+        system: 'Tu es un expert SOC niveau 3. Génère des rapports de sécurité professionnels en français.',
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    // Try Groq if Anthropic fails
+    throw new Error('use_groq');
+  } catch(e) {
+    // Use Groq
+    try {
+      const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          max_tokens: 2000,
+          temperature: 0.3,
+          messages: [
+            { role: 'system', content: 'Tu es un expert SOC niveau 3. Génère des rapports professionnels en français.' },
+            { role: 'user', content: prompt }
+          ]
+        })
+      });
+
+      const data = await resp.json();
+      const analysis = data.choices?.[0]?.message?.content || 'Erreur API';
+
+      const now = new Date().toLocaleString('fr-FR');
+      reportText = `╔══════════════════════════════════════════════════════════╗
+║     RAPPORT SÉCURITÉ HONEYPOT — ${now}
+║     Période: ${hours}h — Source: Elasticsearch + Groq AI
+╚══════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 📊 STATISTIQUES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 🔵 COWRIE SSH
+    Connexions    : ${c.connections.length}
+    Login OK      : ${c.login_success.length}
+    Login KO      : ${c.login_failed.length}
+    Commandes     : ${c.commands.length}
+    IPs uniques   : ${c.ips.length}
+
+ 🟠 DIONAEA
+    Connexions    : ${d.connections.length}
+    Protocoles    : ${Object.keys(d.protocols).join(', ') || 'Aucun'}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 🌐 IPs ATTACKANTES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${c.ips.map(ip => '    • ' + ip).join('\n') || '    • Aucune'}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 🔑 CREDENTIALS ESSAYÉS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    Users     : ${c.usernames.slice(0,10).join(', ') || 'Aucun'}
+    Passwords : ${c.passwords.slice(0,10).join(', ') || 'Aucun'}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 💻 COMMANDES DÉTECTÉES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${c.commands.slice(0,20).map(x => '    • ' + x.input).join('\n') || '    • Aucune'}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ 🤖 ANALYSE IA — Groq LLaMA 3.3 70B
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+${analysis}
+
+══════════════════════════════════════
+ HoneypotAI v1.0 — Cowrie + Dionaea + ELK + Groq
+══════════════════════════════════════`;
+
+      document.getElementById('report-output').textContent = reportText;
+
+    } catch(err) {
+      document.getElementById('report-output').textContent = `Erreur API Groq: ${err.message}`;
+    }
+  }
+
+  document.getElementById('report-loading').classList.remove('show');
+}
+
+function downloadReport() {
+  if (!reportText) { alert('Générer un rapport d\'abord!'); return; }
+  const blob = new Blob([reportText], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `honeypot_rapport_${new Date().toISOString().slice(0,10)}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function clearReport() {
+  reportText = '';
+  document.getElementById('report-output').textContent = 'Rapport effacé.';
+}
+
+// ═══════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════
+function formatTime(ts) {
+  if (!ts) return '—';
+  try { return new Date(ts).toLocaleTimeString('fr-FR'); }
+  catch { return ts.substring(11,19); }
+}
+// ══════════════════════════════════════════════
+// CNN DETECT
+// ══════════════════════════════════════════════
+
+// Construit les sessions depuis state.rawLogs déjà chargé par loadAll()
+function buildSessionsFromState() {
+  const sessions = {};
+
+  for (const log of state.rawLogs) {
+    const tags    = log.tags || [];
+    const honeypot = log.fields?.honeypot || '';
+    if (!tags.includes('cowrie') && honeypot !== 'cowrie') continue;
+
+    const sid = log.session || log.src_ip || 'unknown';
+    const eid = log.eventid || '';
+    const ts  = log['@timestamp'] || '';
+
+    if (!sessions[sid]) {
+      sessions[sid] = {
+        sid,
+        src_ip   : log.src_ip   || '',
+        dst_port : log.dst_port || 2222,
+        start    : ts,
+        end      : ts,
+        login_ok : 0,
+        login_ko : 0,
+        attempts : 0,
+        commands : [],
+        files    : 0
+      };
+    }
+
+    const s = sessions[sid];
+
+    // Mettre à jour timestamps
+    if (ts && ts < s.start) s.start = ts;
+    if (ts && ts > s.end)   s.end   = ts;
+    if (!s.src_ip && log.src_ip) s.src_ip = log.src_ip;
+
+    // Compter les events
+    if      (eid.includes('login.success'))   { s.login_ok++;  s.attempts++; }
+    else if (eid.includes('login.failed'))    { s.login_ko++;  s.attempts++; }
+    else if (eid.includes('command.input'))   {
+      const cmd = log.input || (log.message || '').replace('CMD: ', '');
+      if (cmd) s.commands.push(cmd);
+    }
+    else if (eid.includes('file_download'))   { s.files++; }
+  }
+
+  // Retourner uniquement les sessions avec une IP
+  return Object.values(sessions).filter(s => s.src_ip);
+}
+
+// Convertit une session Cowrie en vecteur 42 features UNSW-NB15
+function sessionToFeatures(s) {
+  let duration = 1.0;
+  try {
+    duration = Math.max(
+      (new Date(s.end) - new Date(s.start)) / 1000,
+      0.1
+    );
+  } catch(e) {}
+
+  const n  = s.attempts    || 0;
+  const ok = s.login_ok    || 0;
+  const ko = s.login_ko    || 0;
+  const nc = s.commands.length;
+  const nf = s.files       || 0;
+  const ne = Math.max(n + nc + nf, 1);
+
+  // Estimation des métriques réseau depuis le comportement
+  const spkts  = n * 3 + nc * 2 + 2;
+  const dpkts  = n * 2 + nc + 1;
+  const sbytes = n * 120 + nc * 80 + nf * 5000;
+  const dbytes = n * 60  + nc * 40 + nf * 2000;
+  const rate   = spkts / duration;
+
+  // Vecteur 42 features — ordre UNSW-NB15
+  return [
+    duration,                          // 0  duration
+    1,                                 // 1  proto (tcp)
+    3,                                 // 2  service (ssh)
+    ok > 0 ? 2 : 6,                   // 3  state
+    spkts,                             // 4  spkts
+    dpkts,                             // 5  dpkts
+    sbytes,                            // 6  sbytes
+    dbytes,                            // 7  dbytes
+    rate,                              // 8  rate
+    64, 64,                            // 9-10 sttl, dttl
+    sbytes / duration,                 // 11 sload
+    dbytes / duration,                 // 12 dload
+    ko, 0,                             // 13-14 sloss, dloss
+    duration / Math.max(spkts, 1),    // 15 sinpkt
+    duration / Math.max(dpkts, 1),    // 16 dinpkt
+    0, 0,                              // 17-18 sjit, djit
+    65535, 0, 0, 65535,               // 19-22 swin,stcpb,dtcpb,dwin
+    0.1, 0.05, 0.05,                  // 23-25 tcprtt,synack,ackdat
+    sbytes / ne,                       // 26 smean
+    dbytes / ne,                       // 27 dmean
+    0,                                 // 28 trans_depth
+    dbytes,                            // 29 response_body_len
+    Math.min(n, 100),                 // 30 ct_srv_src
+    ok > 0 ? 1 : 0,                   // 31 ct_state_ttl
+    Math.min(n, 100),                 // 32 ct_dst_ltm
+    Math.min(n, 50),                  // 33 ct_src_dport_ltm
+    Math.min(n, 50),                  // 34 ct_dst_sport_ltm
+    Math.min(n, 100),                 // 35 ct_dst_src_ltm
+    ok > 0 ? 1 : 0,                   // 36 is_ftp_login
+    0,                                 // 37 ct_ftp_cmd
+    nc,                                // 38 ct_flw_http_mthd
+    Math.min(n, 100),                 // 39 ct_src_ltm
+    Math.min(n, 100),                 // 40 ct_srv_dst
+    n > 10 ? 1 : 0                    // 41 is_sm_ips_ports
+  ];
+}
+
+// Test connexion Flask
+async function testFlask() {
+  const url = document.getElementById('flask-url').value;
+  try {
+    const r = await fetch(`${url}/health`);
+    const d = await r.json();
+    if (d.status === 'ok') {
+      addLiveLog('info', `CNN API OK — modèle: ${d.model || 'CNN1D'}`);
+      alert('Flask API opérationnelle !');
+    }
+  } catch(e) {
+    alert(`Erreur Flask: ${e.message}\nVérifier que app.py tourne sur ${url}`);
+  }
+}
+
+// Analyse toutes les sessions Cowrie via Flask
+async function runCNN() {
+  if (!state.rawLogs.length) {
+    alert('Charger les logs Elasticsearch d\'abord (bouton CHARGER) !');
+    return;
+  }
+
+  const url = document.getElementById('flask-url').value;
+  document.getElementById('cnn-loading').classList.add('show');
+  document.getElementById('cnn-badge').textContent = 'ANALYSE...';
+
+  // Construire sessions depuis les logs déjà chargés
+  const sessions = buildSessionsFromState();
+
+  if (!sessions.length) {
+    alert('Aucune session Cowrie trouvée dans les logs chargés.');
+    document.getElementById('cnn-loading').classList.remove('show');
+    return;
+  }
+
+  // Préparer le payload avec features calculées
+  const payload = sessions.map(s => ({
+    src_ip   : s.src_ip,
+    features : sessionToFeatures(s),
+    // Metadata pour affichage
+    _duration : (() => {
+      try { return Math.max((new Date(s.end)-new Date(s.start))/1000, 0.1); }
+      catch(e) { return 1; }
+    })(),
+    _attempts : s.attempts,
+    _commands : s.commands.length
+  }));
+
+  try {
+    const r = await fetch(`${url}/predict_batch`, {
+      method : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body   : JSON.stringify({ sessions: payload })
+    });
+    const data = await r.json();
+    renderCNNResults(data.results, payload);
+
+  } catch(e) {
+    addLiveLog('alert', `CNN error: ${e.message}`);
+    alert('Erreur CNN API: ' + e.message);
+  }
+
+  document.getElementById('cnn-loading').classList.remove('show');
+}
+
+// Affiche les résultats dans le tableau
+function renderCNNResults(results, payloads) {
+  if (!results?.length) return;
+
+  const attacks = results.filter(r => r.label === 'ATTAQUE').length;
+  const normal  = results.length - attacks;
+  const avg     = Math.round(
+    results.reduce((s, r) => s + r.score, 0) / results.length
+  );
+
+  document.getElementById('cnn-stat-att').textContent   = attacks;
+  document.getElementById('cnn-stat-norm').textContent  = normal;
+  document.getElementById('cnn-stat-avg').textContent   = avg + '%';
+  document.getElementById('cnn-stat-total').textContent = results.length;
+  document.getElementById('cnn-badge').textContent      = results.length + ' sessions';
+
+  // Activer alerte header si attaques détectées
+  if (attacks > 0) {
+    document.getElementById('alert-dot').style.display  = 'block';
+    document.getElementById('alert-text').style.display = 'block';
+    document.getElementById('alert-text').textContent   = `CNN: ${attacks} ATTAQUE(S)`;
+    document.getElementById('alert-banner').classList.add('show');
+  }
+
+  // Trier par score décroissant
+  const combined = results.map((r, i) => ({ ...r, _meta: payloads[i] || {} }))
+                          .sort((a, b) => b.score - a.score);
+
+  document.getElementById('cnn-table').innerHTML = combined.map(r => {
+    const score = r.score || 0;
+    const meta  = r._meta;
+
+    const color = score > 75 ? 'var(--red)'    :
+                  score > 50 ? 'var(--orange)'  :
+                  score > 25 ? 'var(--cyan)'    : 'var(--green)';
+
+    const level = score > 75 ? 'CRITIQUE' :
+                  score > 50 ? 'ÉLEVÉ'    :
+                  score > 25 ? 'MOYEN'    : 'FAIBLE';
+
+    const bar = `
+      <div style="display:flex;align-items:center;gap:6px">
+        <div style="width:70px;height:5px;background:rgba(255,255,255,0.05);border-radius:3px">
+          <div style="width:${score}%;height:100%;background:${color};border-radius:3px"></div>
+        </div>
+        <span style="color:${color};font-size:11px">${score}%</span>
+      </div>`;
+
+    return `
+      <tr>
+        <td class="badge-blue">${r.ip || '—'}</td>
+        <td style="color:var(--text2)">${meta._duration ? meta._duration.toFixed(1)+'s' : '—'}</td>
+        <td style="color:var(--orange)">${meta._attempts || 0}</td>
+        <td style="color:var(--cyan)">${meta._commands || 0}</td>
+        <td>${bar}</td>
+        <td style="color:${color};font-family:'Share Tech Mono',monospace;font-size:10px">${level}</td>
+        <td class="${r.label==='ATTAQUE'?'badge-red':'badge-green'}" style="font-weight:600">${r.label}</td>
+      </tr>`;
+  }).join('');
+
+  addLiveLog('info', `CNN terminé: ${attacks} attaque(s) sur ${results.length} sessions`);
+}
+
+// Test manuel — prédiction individuelle
+async function testManual() {
+  const url = document.getElementById('flask-url').value;
+
+  const s = {
+    login_ok : parseInt(document.getElementById('m-success').value)  || 0,
+    login_ko : parseInt(document.getElementById('m-attempts').value) || 0,
+    attempts : parseInt(document.getElementById('m-attempts').value) || 0,
+    commands : Array(parseInt(document.getElementById('m-cmds').value) || 0).fill('cmd'),
+    files    : 0,
+    start    : new Date(Date.now() - (parseFloat(document.getElementById('m-duration').value)||1)*1000).toISOString(),
+    end      : new Date().toISOString()
+  };
+
+  try {
+    const r = await fetch(`${url}/predict`, {
+      method : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body   : JSON.stringify({ features: sessionToFeatures(s) })
+    });
+    const d = await r.json();
+
+    const color = d.label === 'ATTAQUE' ? 'var(--red)' : 'var(--green)';
+    document.getElementById('manual-result').innerHTML = `
+      <span style="color:${color};font-size:20px;font-weight:700">${d.label}</span>
+      &nbsp;&nbsp;
+      <span style="color:var(--text2)">Score:</span>
+      <span style="color:var(--orange);font-size:16px;margin:0 10px">${d.score}%</span>
+      <span style="color:var(--text2)">Confiance:</span>
+      <span style="color:var(--cyan);margin-left:8px">${d.confidence}%</span>
+    `;
+  } catch(e) {
+    document.getElementById('manual-result').innerHTML =
+      `<span style="color:var(--red)">Erreur Flask: ${e.message}</span>`;
+  }
+}
+
+// Reset
+function clearCNN() {
+  ['cnn-stat-att','cnn-stat-norm','cnn-stat-avg','cnn-stat-total']
+    .forEach(id => document.getElementById(id).textContent = '—');
+  document.getElementById('cnn-table').innerHTML =
+    '<tr><td colspan="7" class="empty">Réinitialisé</td></tr>';
+  document.getElementById('cnn-badge').textContent = 'EN ATTENTE';
+  document.getElementById('manual-result').textContent = 'Réinitialisé';
+}
+</script>
+</body>
+</html>
