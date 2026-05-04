@@ -985,7 +985,7 @@ async function queryES(hours) {
   const host = document.getElementById('es-host').value;
   const cutoff = new Date(Date.now() - hours * 3600000).toISOString();
   const query = {
-    size: 1000,
+    size: 5000,
     sort: [{"@timestamp": {"order": "desc"}}],
     query: { range: { "@timestamp": { gte: cutoff } } }
   };
@@ -1642,19 +1642,45 @@ async function runCNN() {
 function renderCNNResults(results, payloads) {
   if (!results?.length) return;
 
-  const attacks = results.filter(r => r.label === 'ATTAQUE').length;
-  const normal  = results.length - attacks;
-  const avg     = Math.round(
-    results.reduce((s, r) => s + r.score, 0) / results.length
-  );
+  // Enrichir chaque résultat avec règles Cowrie
+  const enriched = results.map((r, i) => {
+    const meta  = payloads[i] || {};
+    let   score = r.score;
+    let   label = r.label;
+
+    // Règles basées sur comportement Cowrie réel
+    const attempts = meta._attempts || 0;
+    const commands = meta._commands || 0;
+    const duration = meta._duration || 0;
+
+    // Brute force détecté
+    if (attempts >= 5)  score = Math.max(score, 65);
+    if (attempts >= 20) score = Math.max(score, 80);
+    if (attempts >= 50) score = Math.max(score, 92);
+
+    // Commandes post-exploitation
+    if (commands >= 3)  score = Math.max(score, 70);
+    if (commands >= 10) score = Math.max(score, 88);
+
+    // Brute force + commandes = CRITIQUE
+    if (attempts >= 5 && commands >= 3) score = Math.max(score, 95);
+
+    // Mettre à jour le label
+    label = score > 50 ? 'ATTAQUE' : 'NORMAL';
+
+    return { ...r, score: Math.round(score), label, _meta: meta };
+  });
+
+  const attacks = enriched.filter(r => r.label === 'ATTAQUE').length;
+  const normal  = enriched.length - attacks;
+  const avg     = Math.round(enriched.reduce((s,r) => s+r.score, 0) / enriched.length);
 
   document.getElementById('cnn-stat-att').textContent   = attacks;
   document.getElementById('cnn-stat-norm').textContent  = normal;
   document.getElementById('cnn-stat-avg').textContent   = avg + '%';
-  document.getElementById('cnn-stat-total').textContent = results.length;
-  document.getElementById('cnn-badge').textContent      = results.length + ' sessions';
+  document.getElementById('cnn-stat-total').textContent = enriched.length;
+  document.getElementById('cnn-badge').textContent      = enriched.length + ' sessions';
 
-  // Activer alerte header si attaques détectées
   if (attacks > 0) {
     document.getElementById('alert-dot').style.display  = 'block';
     document.getElementById('alert-text').style.display = 'block';
@@ -1662,17 +1688,15 @@ function renderCNNResults(results, payloads) {
     document.getElementById('alert-banner').classList.add('show');
   }
 
-  // Trier par score décroissant
-  const combined = results.map((r, i) => ({ ...r, _meta: payloads[i] || {} }))
-                          .sort((a, b) => b.score - a.score);
+  const sorted = [...enriched].sort((a,b) => b.score - a.score);
 
-  document.getElementById('cnn-table').innerHTML = combined.map(r => {
+  document.getElementById('cnn-table').innerHTML = sorted.map(r => {
     const score = r.score || 0;
     const meta  = r._meta;
 
-    const color = score > 75 ? 'var(--red)'    :
-                  score > 50 ? 'var(--orange)'  :
-                  score > 25 ? 'var(--cyan)'    : 'var(--green)';
+    const color = score > 75 ? 'var(--red)'   :
+                  score > 50 ? 'var(--orange)' :
+                  score > 25 ? 'var(--cyan)'   : 'var(--green)';
 
     const level = score > 75 ? 'CRITIQUE' :
                   score > 50 ? 'ÉLEVÉ'    :
@@ -1691,14 +1715,14 @@ function renderCNNResults(results, payloads) {
         <td class="badge-blue">${r.ip || '—'}</td>
         <td style="color:var(--text2)">${meta._duration ? meta._duration.toFixed(1)+'s' : '—'}</td>
         <td style="color:var(--orange)">${meta._attempts || 0}</td>
-        <td style="color:var(--cyan)">${meta._commands || 0}</td>
+        <td style="color:var(--cyan)">${meta._commands  || 0}</td>
         <td>${bar}</td>
         <td style="color:${color};font-family:'Share Tech Mono',monospace;font-size:10px">${level}</td>
         <td class="${r.label==='ATTAQUE'?'badge-red':'badge-green'}" style="font-weight:600">${r.label}</td>
       </tr>`;
   }).join('');
 
-  addLiveLog('info', `CNN terminé: ${attacks} attaque(s) sur ${results.length} sessions`);
+  addLiveLog('info', `CNN+Règles: ${attacks} attaque(s) sur ${enriched.length} sessions`);
 }
 
 // Test manuel — prédiction individuelle

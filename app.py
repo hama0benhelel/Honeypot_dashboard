@@ -41,7 +41,7 @@ def predict():
         
         return jsonify({
             'score'     : round(prob * 100, 2),
-            'label'     : 'ATTAQUE' if prob > 0.5 else 'NORMAL',  # THRESHOLD = 0.5
+            'label'     : 'ATTAQUE' if prob > 0.1 else 'NORMAL',  # THRESHOLD = 0.5
             'confidence': round(max(prob, 1-prob) * 100, 2),
             'raw_prob'  : round(prob, 4)
         })
@@ -68,7 +68,7 @@ def predict_batch():
             results.append({
                 'ip'   : s.get('src_ip', 'unknown'),
                 'score': round(prob * 100, 2),
-                'label': 'ATTAQUE' if prob > 0.5 else 'NORMAL',  # THRESHOLD = 0.5
+                'label': 'ATTAQUE' if prob > 0.1 else 'NORMAL',  # THRESHOLD = 0.5
                 'confidence': round(max(prob, 1-prob) * 100, 2)
             })
         
