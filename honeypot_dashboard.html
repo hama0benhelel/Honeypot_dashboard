@@ -1524,12 +1524,14 @@ function sessionToFeatures(s) {
   const nf = s.files       || 0;
   const ne = Math.max(n + nc + nf, 1);
 
-  // Estimation des métriques réseau depuis le comportement
-  const spkts  = n * 3 + nc * 2 + 2;
-  const dpkts  = n * 2 + nc + 1;
-  const sbytes = n * 120 + nc * 80 + nf * 5000;
-  const dbytes = n * 60  + nc * 40 + nf * 2000;
-  const rate   = spkts / duration;
+
+
+// Par des valeurs plus agressives :
+const spkts  = n * 10  + nc * 5   + 2;
+const dpkts  = n * 8   + nc * 3   + 1;
+const sbytes = n * 500 + nc * 300 + nf * 10000;
+const dbytes = n * 200 + nc * 150 + nf * 5000;
+const rate   = spkts / duration;
 
   // Vecteur 42 features — ordre UNSW-NB15
   return [
@@ -1591,6 +1593,7 @@ async function runCNN() {
     alert('Charger les logs Elasticsearch d\'abord (bouton CHARGER) !');
     return;
   }
+  console.log('Running CNN analysis on sessions built from state.rawLogs...');
 
   const url = document.getElementById('flask-url').value;
   document.getElementById('cnn-loading').classList.add('show');
