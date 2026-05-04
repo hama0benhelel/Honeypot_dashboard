@@ -1460,51 +1460,80 @@ function formatTime(ts) {
 
 // Construit les sessions depuis state.rawLogs déjà chargé par loadAll()
 function buildSessionsFromState() {
-  const sessions = {};
+  const INACTIVITY_MS = 15 * 60 * 1000; // 15 minutes
+
+  // Étape 1 — Collecter tous les events Cowrie par IP
+  const eventsByIP = {};
 
   for (const log of state.rawLogs) {
-    const tags    = log.tags || [];
+    const tags     = log.tags || [];
     const honeypot = log.fields?.honeypot || '';
     if (!tags.includes('cowrie') && honeypot !== 'cowrie') continue;
 
-    const sid = log.session || log.src_ip || 'unknown';
+    const ip  = log.src_ip || 'unknown';
     const eid = log.eventid || '';
     const ts  = log['@timestamp'] || '';
+    if (!ip || ip === 'unknown' || !ts) continue;
 
-    if (!sessions[sid]) {
-      sessions[sid] = {
-        sid,
-        src_ip   : log.src_ip   || '',
-        dst_port : log.dst_port || 2222,
-        start    : ts,
-        end      : ts,
-        login_ok : 0,
-        login_ko : 0,
-        attempts : 0,
-        commands : [],
-        files    : 0
-      };
-    }
-
-    const s = sessions[sid];
-
-    // Mettre à jour timestamps
-    if (ts && ts < s.start) s.start = ts;
-    if (ts && ts > s.end)   s.end   = ts;
-    if (!s.src_ip && log.src_ip) s.src_ip = log.src_ip;
-
-    // Compter les events
-    if      (eid.includes('login.success'))   { s.login_ok++;  s.attempts++; }
-    else if (eid.includes('login.failed'))    { s.login_ko++;  s.attempts++; }
-    else if (eid.includes('command.input'))   {
-      const cmd = log.input || (log.message || '').replace('CMD: ', '');
-      if (cmd) s.commands.push(cmd);
-    }
-    else if (eid.includes('file_download'))   { s.files++; }
+    if (!eventsByIP[ip]) eventsByIP[ip] = [];
+    eventsByIP[ip].push({ ts, eid, log });
   }
 
-  // Retourner uniquement les sessions avec une IP
-  return Object.values(sessions).filter(s => s.src_ip);
+  // Étape 2 — Pour chaque IP, grouper par inactivité 15min
+  const sessions = [];
+
+  for (const [ip, events] of Object.entries(eventsByIP)) {
+
+    // Trier par timestamp croissant
+    events.sort((a, b) => new Date(a.ts) - new Date(b.ts));
+
+    let currentSession = null;
+
+    for (const { ts, eid, log } of events) {
+      const tsMs = new Date(ts).getTime();
+
+      // Nouvelle session si :
+      // - pas de session courante
+      // - inactivité > 15min depuis le dernier event
+      if (!currentSession ||
+          tsMs - new Date(currentSession.end).getTime() > INACTIVITY_MS) {
+
+        // Sauvegarder la session précédente
+        if (currentSession) sessions.push(currentSession);
+
+        // Créer une nouvelle session
+        currentSession = {
+          sid     : `${ip}_${ts}`,
+          src_ip  : ip,
+          dst_port: log.dst_port || 2222,
+          start   : ts,
+          end     : ts,
+          login_ok: 0,
+          login_ko: 0,
+          attempts: 0,
+          commands: [],
+          files   : 0
+        };
+      }
+
+      // Mettre à jour le end timestamp
+      currentSession.end = ts;
+
+      // Compter les events
+      if      (eid.includes('login.success')) { currentSession.login_ok++; currentSession.attempts++; }
+      else if (eid.includes('login.failed'))  { currentSession.login_ko++; currentSession.attempts++; }
+      else if (eid.includes('command.input')) {
+        const cmd = log.input || (log.message || '').replace('CMD: ', '');
+        if (cmd) currentSession.commands.push(cmd);
+      }
+      else if (eid.includes('file_download')) { currentSession.files++; }
+    }
+
+    // Sauvegarder la dernière session
+    if (currentSession) sessions.push(currentSession);
+  }
+
+  return sessions;
 }
 
 // Convertit une session Cowrie en vecteur 42 features UNSW-NB15
