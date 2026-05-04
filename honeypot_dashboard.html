@@ -1756,39 +1756,86 @@ function renderCNNResults(results, payloads) {
 
 // Test manuel — prédiction individuelle
 async function testManual() {
-  const url = document.getElementById('flask-url').value;
+  const url      = document.getElementById('flask-url').value;
+  const attempts = parseInt(document.getElementById('m-attempts').value) || 0;
+  const success  = parseInt(document.getElementById('m-success').value)  || 0;
+  const cmds     = parseInt(document.getElementById('m-cmds').value)     || 0;
+  const duration = parseFloat(document.getElementById('m-duration').value) || 1;
 
-  const s = {
-    login_ok : parseInt(document.getElementById('m-success').value)  || 0,
-    login_ko : parseInt(document.getElementById('m-attempts').value) || 0,
-    attempts : parseInt(document.getElementById('m-attempts').value) || 0,
-    commands : Array(parseInt(document.getElementById('m-cmds').value) || 0).fill('cmd'),
-    files    : 0,
-    start    : new Date(Date.now() - (parseFloat(document.getElementById('m-duration').value)||1)*1000).toISOString(),
-    end      : new Date().toISOString()
-  };
+  // ── Règles comportementales Cowrie ──
+  let score = 0;
 
+  if (attempts >= 3)   score = Math.max(score, 55);
+  if (attempts >= 10)  score = Math.max(score, 68);
+  if (attempts >= 50)  score = Math.max(score, 80);
+  if (attempts >= 100) score = Math.max(score, 90);
+  if (attempts >= 200) score = Math.max(score, 96);
+
+  if (cmds >= 1)  score = Math.max(score, 60);
+  if (cmds >= 5)  score = Math.max(score, 75);
+  if (cmds >= 10) score = Math.max(score, 88);
+
+  if (success >= 1 && attempts >= 3)  score = Math.max(score, 85);
+  if (success >= 1 && cmds >= 5)      score = Math.max(score, 95);
+  if (attempts >= 20 && cmds >= 3)    score = Math.max(score, 92);
+
+  const label = score > 50 ? 'ATTAQUE' : 'NORMAL';
+  const level = score > 75 ? 'CRITIQUE' :
+                score > 50 ? 'ÉLEVÉ'    :
+                score > 25 ? 'MOYEN'    : 'FAIBLE';
+  const color = score > 75 ? 'var(--red)'   :
+                score > 50 ? 'var(--orange)' :
+                score > 25 ? 'var(--cyan)'   : 'var(--green)';
+
+  // ── Aussi appeler Flask pour avoir le score CNN brut ──
+  let cnn_score = 0;
   try {
+    const s = {
+      login_ok : success,
+      login_ko : attempts - success,
+      attempts,
+      commands : Array(cmds).fill('cmd'),
+      files    : 0,
+      start    : new Date(Date.now() - duration*1000).toISOString(),
+      end      : new Date().toISOString()
+    };
     const r = await fetch(`${url}/predict`, {
       method : 'POST',
       headers: { 'Content-Type': 'application/json' },
       body   : JSON.stringify({ features: sessionToFeatures(s) })
     });
     const d = await r.json();
+    cnn_score = d.score || 0;
+  } catch(e) {}
 
-    const color = d.label === 'ATTAQUE' ? 'var(--red)' : 'var(--green)';
-    document.getElementById('manual-result').innerHTML = `
-      <span style="color:${color};font-size:20px;font-weight:700">${d.label}</span>
-      &nbsp;&nbsp;
+  // Score final = max(règles, CNN)
+  const final_score = Math.max(score, cnn_score);
+  const final_label = final_score > 50 ? 'ATTAQUE' : 'NORMAL';
+  const final_level = final_score > 75 ? 'CRITIQUE' :
+                      final_score > 50 ? 'ÉLEVÉ'    :
+                      final_score > 25 ? 'MOYEN'    : 'FAIBLE';
+  const final_color = final_score > 75 ? 'var(--red)'   :
+                      final_score > 50 ? 'var(--orange)' :
+                      final_score > 25 ? 'var(--cyan)'   : 'var(--green)';
+
+  document.getElementById('manual-result').innerHTML = `
+    <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap">
+      <span style="color:${final_color};font-size:22px;font-weight:700">${final_label}</span>
+      <span style="color:${final_color};font-family:'Share Tech Mono',monospace">${final_level}</span>
       <span style="color:var(--text2)">Score:</span>
-      <span style="color:var(--orange);font-size:16px;margin:0 10px">${d.score}%</span>
-      <span style="color:var(--text2)">Confiance:</span>
-      <span style="color:var(--cyan);margin-left:8px">${d.confidence}%</span>
-    `;
-  } catch(e) {
-    document.getElementById('manual-result').innerHTML =
-      `<span style="color:var(--red)">Erreur Flask: ${e.message}</span>`;
-  }
+      <span style="color:var(--orange);font-size:18px">${final_score}%</span>
+      <span style="color:var(--text2)">CNN brut:</span>
+      <span style="color:var(--cyan)">${cnn_score}%</span>
+      <span style="color:var(--text2)">Règles:</span>
+      <span style="color:var(--green)">${score}%</span>
+    </div>
+    <div style="margin-top:10px;font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text2)">
+      ${attempts} tentatives &nbsp;|&nbsp; 
+      ${success} succès &nbsp;|&nbsp; 
+      ${cmds} commandes &nbsp;|&nbsp; 
+      ${duration}s durée
+    </div>
+  `;
 }
 
 // Reset
