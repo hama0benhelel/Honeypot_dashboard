@@ -611,6 +611,7 @@
   <button class="tab" onclick="showPage('attacks', this)">⚡ Attaques</button>
   <button class="tab" onclick="showPage('commands', this)">$ Commandes</button>
   <button class="tab" onclick="showPage('cnn', this)">🧠 CNN Detect</button>
+  <button class="tab" onclick="showPage('suricata', this)">🛡 SURICATA SIEM</button>
   <button class="tab" onclick="showPage('report', this)">📋 Rapport AI</button>
 </nav>
 
@@ -915,6 +916,52 @@
   </div>
 </div>
 
+<!--=================SIEM=======================-->
+<div class="page" id="page-suricata">
+
+  <div class="stats-grid">
+    <div class="stat-card red">
+      <div class="stat-label">ALERTS</div>
+      <div class="stat-value" id="suricata-alerts">—</div>
+    </div>
+
+    <div class="stat-card orange">
+      <div class="stat-label">SUSPICIOUS IPS</div>
+      <div class="stat-value" id="suricata-ips">—</div>
+    </div>
+
+    <div class="stat-card blue">
+      <div class="stat-label">PROTOCOL EVENTS</div>
+      <div class="stat-value" id="suricata-events">—</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-title">SURICATA ALERT STREAM</span>
+    </div>
+
+    <div class="panel-body">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>TIME</th>
+            <th>SRC IP</th>
+            <th>DEST IP</th>
+            <th>SIGNATURE</th>
+            <th>SEVERITY</th>
+            <th>ACTION</th>
+          </tr>
+        </thead>
+        <tbody id="suricata-table">
+          <tr><td colspan="5" class="empty">No data</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
 <!-- ═══════════════════════════════ RAPPORT ═══════════════════════════════ -->
 <div class="page" id="page-report">
   <div class="report-controls">
@@ -1060,31 +1107,60 @@ async function loadAll() {
 
   try {
     const logs = await queryES(hours);
+
     state.rawLogs = logs;
+
+    // Cowrie + Dionaea
     const parsed = parseLogs(logs);
+
     state.cowrie = parsed.cowrie;
     state.dionaea = parsed.dionaea;
 
+    // ═════════ SURICATA ═════════
+    const suricataParsed = parseSuricataLogs(logs);
+
+    state.suricata = suricataParsed;
+
+    // UPDATE UI
     updateDashboard();
     updateAttacks();
     updateCommands();
+
+    // SURICATA UI
+    updateSuricata();
+
     addLiveLogs(logs.slice(0, 30));
 
     // Alert si trop de login success
     if (state.cowrie.login_success.length > 10) {
-      document.getElementById('alert-banner').classList.add('show');
-      document.getElementById('alert-dot').style.display = 'block';
-      document.getElementById('alert-text').style.display = 'block';
+
+      document.getElementById('alert-banner')
+        .classList.add('show');
+
+      document.getElementById('alert-dot')
+        .style.display = 'block';
+
+      document.getElementById('alert-text')
+        .style.display = 'block';
     }
 
   } catch(e) {
+
     addLiveLog('error', `Erreur connexion ES: ${e.message}`);
-    alert(`Erreur: ${e.message}\n\nVérifier:\n1. Elasticsearch démarré\n2. URL correcte\n3. CORS activé`);
+
+    alert(
+      `Erreur: ${e.message}
+
+Vérifier:
+1. Elasticsearch démarré
+2. URL correcte
+3. CORS activé`
+    );
   }
 
-  document.getElementById('main-loading').classList.remove('show');
+  document.getElementById('main-loading')
+    .classList.remove('show');
 }
-
 // ═══════════════════════════════════════════════
 // UPDATE DASHBOARD
 // ═══════════════════════════════════════════════
@@ -1454,6 +1530,12 @@ function formatTime(ts) {
   try { return new Date(ts).toLocaleTimeString('fr-FR'); }
   catch { return ts.substring(11,19); }
 }
+//==================================
+
+
+
+
+
 // ══════════════════════════════════════════════
 // CNN DETECT
 // ══════════════════════════════════════════════
@@ -1847,6 +1929,192 @@ function clearCNN() {
   document.getElementById('cnn-badge').textContent = 'EN ATTENTE';
   document.getElementById('manual-result').textContent = 'Réinitialisé';
 }
+
+// ═══════════════════════════════════════════════
+// SURICATA SIEM
+// ═══════════════════════════════════════════════
+
+function parseSuricataLogs(logs) {
+
+  const suricata = {
+    alerts: [],
+    ips: new Set(),
+    events: 0
+  };
+
+  for (const log of logs) {
+
+    const tags = log.tags || [];
+    const honeypot = log.fields?.honeypot || '';
+
+    // détecter logs suricata
+    if (
+      tags.includes('suricata') ||
+      honeypot === 'suricata' ||
+      log.event_type === 'alert'
+    ) {
+
+      const alert = {
+        timestamp : log['@timestamp'] || '',
+        src_ip    : log.src_ip || log.source?.ip || '—',
+        dest_ip   : log.dest_ip || log.destination?.ip || '—',
+        severity  : log.alert?.severity || 1,
+        signature : log.alert?.signature ||
+                    log.message ||
+                    'Unknown alert'
+      };
+
+      suricata.alerts.push(alert);
+
+      if (alert.src_ip !== '—') {
+        suricata.ips.add(alert.src_ip);
+      }
+
+      suricata.events++;
+    }
+  }
+
+  suricata.ips = [...suricata.ips];
+
+  return suricata;
+}
+
+
+// ═══════════════════════════════════════════════
+// UPDATE SURICATA UI
+// ═══════════════════════════════════════════════
+
+function updateSuricata() {
+
+  const s = state.suricata || {
+    alerts: [],
+    ips: [],
+    events: 0
+  };
+
+  // stats
+  document.getElementById('suricata-alerts').textContent =
+    s.alerts.length;
+
+  document.getElementById('suricata-ips').textContent =
+    s.ips.length;
+
+  document.getElementById('suricata-events').textContent =
+    s.events;
+
+  // table
+  const tbody = document.getElementById('suricata-table');
+
+  if (!s.alerts.length) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="5" class="empty">
+          No Suricata alerts found
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = s.alerts
+    .sort((a,b) =>
+      new Date(b.timestamp) - new Date(a.timestamp)
+    )
+    .slice(0, 50)
+    .map(a => {
+
+      let sevClass = 'badge-green';
+
+      if (a.severity >= 3)
+        sevClass = 'badge-red';
+      else if (a.severity == 2)
+        sevClass = 'badge-orange';
+
+     return `
+<tr>
+
+  <td style="color:var(--text2)">
+    ${formatTime(a.timestamp)}
+  </td>
+
+  <td class="badge-blue">
+    ${a.src_ip}
+  </td>
+
+  <td class="badge-cyan">
+    ${a.dest_ip}
+  </td>
+
+  <td style="color:var(--text)">
+    ${a.signature}
+  </td>
+
+  <td class="${sevClass}">
+    ${a.severity}
+  </td>
+
+  <td>
+    <button
+      class="btn btn-red"
+      onclick="blockIP('${a.src_ip}')"
+      style="padding:6px 10px;font-size:10px"
+    >
+      BLOCK
+    </button>
+  </td>
+
+</tr>
+`;
+    })
+    .join('');
+}
+// ═══════════════════════════════════════
+// SOAR BLOCK IP
+// ═══════════════════════════════════════
+
+async function blockIP(ip) {
+
+  if (!confirm(`Block attacker IP ${ip} ?`))
+    return;
+
+  try {
+
+    const flask = document.getElementById('flask-url').value;
+
+    const resp = await fetch(`${flask}/block_ip`, {
+      method: 'POST',
+
+      headers: {
+        'Content-Type': 'application/json'
+      },
+
+      body: JSON.stringify({
+        ip: ip
+      })
+    });
+
+    const data = await resp.json();
+
+    if (data.status === 'success') {
+
+      addLiveLog(
+        'alert',
+        `SOAR blocked IP ${ip}`
+      );
+
+      alert(`IP ${ip} blocked successfully`);
+
+    } else {
+
+      alert(data.message || 'SOAR error');
+    }
+
+  } catch(e) {
+
+    alert(`SOAR API error: ${e.message}`);
+  }
+}
+
 </script>
 </body>
 </html>
