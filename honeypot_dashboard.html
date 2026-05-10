@@ -423,24 +423,137 @@
     flex-wrap: wrap;
   }
 
-  .report-output {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    padding: 24px;
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 12px;
-    line-height: 1.8;
-    white-space: pre-wrap;
-    max-height: 600px;
-    overflow-y: auto;
-    color: var(--text);
-    min-height: 200px;
-  }
+.report-output {
 
-  .report-output .r-header { color: var(--green); font-weight: bold; }
-  .report-output .r-section { color: var(--cyan); }
-  .report-output .r-value { color: var(--orange); }
-  .report-output .r-alert { color: var(--red); }
+  background: #111827;
+
+  border: 1px solid #1f2937;
+
+  border-radius: 12px;
+
+  padding: 28px;
+
+  font-family: 'Inter', 'Share Tech Mono', monospace;
+
+  font-size: 14px;
+
+  line-height: 1.9;
+
+  white-space: pre-wrap;
+
+  max-height: 650px;
+
+  overflow-y: auto;
+
+  color: #e5e7eb;
+
+  min-height: 240px;
+
+  box-shadow:
+    0 4px 20px rgba(0,0,0,0.25);
+
+  position: relative;
+}
+
+/* top bar */
+.report-output::before {
+
+  content: 'AI SECURITY REPORT';
+
+  position: absolute;
+
+  top: 0;
+  left: 0;
+  right: 0;
+
+  height: 42px;
+
+  display: flex;
+
+  align-items: center;
+
+  padding-left: 18px;
+
+  background: #0f172a;
+
+  border-bottom: 1px solid #1e293b;
+
+  color: #22c55e;
+
+  font-size: 12px;
+
+  font-weight: 600;
+
+  letter-spacing: 1.5px;
+}
+
+/* content */
+.report-output {
+  padding-top: 60px;
+}
+
+/* scrollbar */
+.report-output::-webkit-scrollbar {
+  width: 8px;
+}
+
+.report-output::-webkit-scrollbar-thumb {
+
+  background: #374151;
+
+  border-radius: 10px;
+}
+
+.report-output::-webkit-scrollbar-thumb:hover {
+
+  background: #4b5563;
+}
+
+/* HEADER */
+.report-output .r-header {
+
+  color: #22c55e;
+
+  font-size: 20px;
+
+  font-weight: 700;
+
+  margin-bottom: 22px;
+
+  border-bottom: 1px solid #1f2937;
+
+  padding-bottom: 10px;
+}
+
+/* sections */
+.report-output .r-section {
+
+  color: #38bdf8;
+
+  font-size: 15px;
+
+  font-weight: 600;
+
+  margin-top: 24px;
+
+  margin-bottom: 12px;
+}
+
+/* values */
+.report-output .r-value {
+
+  color: #f59e0b;
+
+  font-weight: 600;
+}
+
+/* alerts */
+.report-output .r-alert {
+
+  color: #ef4444;
+
+  font-weight: 700;
+}
 
   /* LOADING */
   .loading {
@@ -1004,7 +1117,7 @@ let state = {
   rawLogs: []
 };
 
-let reportText = '';
+
 
 // ═══════════════════════════════════════════════
 // CLOCK
@@ -1376,162 +1489,499 @@ function addLiveLog(level, msg) {
 // ═══════════════════════════════════════════════
 // GENERATE REPORT
 // ═══════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════
+// GLOBAL REPORT VARIABLE
+// ═══════════════════════════════════════════════
+
+let reportText = '';
+
+
+// ═══════════════════════════════════════════════
+// GENERATE AI REPORT
+// ═══════════════════════════════════════════════
+
 async function generateReport() {
-  const apiKey = document.getElementById('groq-key').value.trim();
-  if (!apiKey) { alert('Entrer votre clé Groq API!'); return; }
-  if (!state.rawLogs.length) { alert('Charger les données d\'abord!'); return; }
 
-  document.getElementById('report-loading').classList.add('show');
-  document.getElementById('report-output').textContent = 'Analyse en cours...';
+  const apiKey =
+    document.getElementById('groq-key').value.trim();
 
-  const c = state.cowrie;
-  const d = state.dionaea;
-  const hours = document.getElementById('hours-select').value;
+  if (!apiKey) {
+    alert('Entrer votre clé Groq API!');
+    return;
+  }
 
-  const prompt = `Tu es un expert SOC niveau 3. Analyse ces données honeypot sur ${hours}h:
+  if (!state.rawLogs.length) {
+    alert('Charger les données d\'abord!');
+    return;
+  }
 
-COWRIE SSH:
-- Connexions: ${c.connections.length}
-- Login réussis: ${c.login_success.length}
-- Login échoués: ${c.login_failed.length}
-- Commandes: ${c.commands.length}
-- IPs: ${c.ips.slice(0,10).join(', ')}
-- Usernames: ${c.usernames.slice(0,10).join(', ')}
-- Passwords: ${c.passwords.slice(0,10).join(', ')}
-- Commandes list: ${c.commands.slice(0,20).map(x=>x.input).join(', ')}
+  // ============================================
+  // UI LOADING
+  // ============================================
 
-DIONAEA:
-- Connexions: ${d.connections.length}
-- Protocoles: ${JSON.stringify(d.protocols)}
+  document
+    .getElementById('report-loading')
+    .classList.add('show');
 
-Fournis un rapport complet:
-1. PROFIL ATTAQUANT (type, sophistication)
-2. MITRE ATT&CK (codes T-XXXX)
-3. OBJECTIF PROBABLE
-4. NIVEAU MENACE (X/10)
-5. COMPORTEMENT DÉTAILLÉ
-6. RECOMMANDATIONS
+  document
+    .getElementById('report-output')
+    .textContent = 'Analyse SOC IA en cours...';
 
-Style: rapport SOC professionnel en français.`;
+  // ============================================
+  // DATA SOURCES
+  // ============================================
+
+  const c = state.cowrie || {};
+  const d = state.dionaea || {};
+  const s = state.suricata || {};
+
+  const hours =
+    document.getElementById('hours-select').value;
+
+  // ============================================
+  // SAFE DEFAULTS
+  // ============================================
+
+  c.connections = c.connections || [];
+  c.login_success = c.login_success || [];
+  c.login_failed = c.login_failed || [];
+  c.commands = c.commands || [];
+  c.ips = c.ips || [];
+  c.usernames = c.usernames || [];
+  c.passwords = c.passwords || [];
+
+  d.connections = d.connections || [];
+  d.protocols = d.protocols || {};
+
+  s.alerts = s.alerts || [];
+  s.signatures = s.signatures || [];
+
+  // ============================================
+  // TOP COMMANDS
+  // ============================================
+
+  const topCommands = {};
+
+  c.commands.forEach(cmd => {
+
+    const input =
+      (cmd.input || 'unknown')
+      .substring(0, 80);
+
+    topCommands[input] =
+      (topCommands[input] || 0) + 1;
+  });
+
+  const sortedCommands =
+    Object.entries(topCommands)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
+
+  // ============================================
+  // TIMELINE
+  // ============================================
+
+  const firstAttack =
+    state.rawLogs[0]?.timestamp || 'N/A';
+
+  const lastAttack =
+    state.rawLogs[
+      state.rawLogs.length - 1
+    ]?.timestamp || 'N/A';
+
+  // ============================================
+  // SURICATA SUMMARY
+  // ============================================
+
+  const alertSummary =
+    s.alerts
+      .slice(0, 5)
+      .map(alert => {
+
+        return `
+- Signature:
+  ${alert.signature || 'unknown'}
+
+- Source:
+  ${alert.src_ip || '?'}
+
+- Destination:
+  ${alert.dest_ip || '?'}
+`;
+      })
+      .join('\n');
+
+  const signatureSummary =
+    s.signatures
+      .slice(0, 5)
+      .join(', ');
+
+  // ============================================
+  // USER PROMPT
+  // ============================================
+
+  const prompt = `
+Analyse SOC Honeypot sur ${hours} heures.
+
+━━━━━━━━━━━━━━━━━━
+COWRIE SSH
+━━━━━━━━━━━━━━━━━━
+
+Connexions :
+${c.connections.length}
+
+Login réussis :
+${c.login_success.length}
+
+Login échoués :
+${c.login_failed.length}
+
+IPs détectées :
+${c.ips.slice(0, 10).join(', ')}
+
+Usernames :
+${c.usernames.slice(0, 10).join(', ')}
+
+Passwords :
+${c.passwords.slice(0, 10).join(', ')}
+
+Top commandes :
+${sortedCommands
+  .map(([cmd, count]) => `${cmd} (${count})`)
+  .join('\n')}
+
+━━━━━━━━━━━━━━━━━━
+DIONAEA
+━━━━━━━━━━━━━━━━━━
+
+Connexions :
+${d.connections.length}
+
+Protocoles :
+${Object.keys(d.protocols).join(', ')}
+
+━━━━━━━━━━━━━━━━━━
+SURICATA IDS
+━━━━━━━━━━━━━━━━━━
+
+Alertes :
+${alertSummary}
+
+Signatures :
+${signatureSummary}
+
+━━━━━━━━━━━━━━━━━━
+TIMELINE
+━━━━━━━━━━━━━━━━━━
+
+Première attaque :
+${firstAttack}
+
+Dernière attaque :
+${lastAttack}
+
+━━━━━━━━━━━━━━━━━━
+OBJECTIFS
+━━━━━━━━━━━━━━━━━━
+
+Fournir :
+
+1. Synthèse exécutive
+2. Niveau menace /10
+3. Analyse attaquant
+4. IOC
+5. MITRE ATT&CK
+6. Analyse comportementale
+7. Impact potentiel
+8. Recommandations
+9. Actions SOAR
+
+IMPORTANT :
+- Ne jamais inventer de données
+- Détecter brute force
+- Détecter botnet Linux/IoT
+- Détecter malware
+- Corréler les événements`;
+
+  // ============================================
+  // SYSTEM PROMPT
+  // ============================================
+
+  const systemPrompt = `
+Tu es un analyste SOC Level 3 expert en :
+- Honeypots
+- SIEM/SOAR
+- Suricata IDS
+- Threat Hunting
+- MITRE ATT&CK
+- Malware Linux
+
+MISSION :
+Produire un rapport SOC technique,
+précis et structuré.
+
+STYLE :
+- Français professionnel
+- Technique
+- Concis
+- Sans hallucination
+
+Le rapport doit inclure :
+- IOC
+- MITRE ATT&CK
+- Niveau menace
+- Recommandations
+- Corrélation événements
+`;
 
   try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
-        system: 'Tu es un expert SOC niveau 3. Génère des rapports de sécurité professionnels en français.',
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
 
-    // Try Groq if Anthropic fails
-    throw new Error('use_groq');
-  } catch(e) {
-    // Use Groq
-    try {
-      const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    // ============================================
+    // API REQUEST
+    // ============================================
+
+    const resp = await fetch(
+      'https://api.groq.com/openai/v1/chat/completions',
+      {
+
         method: 'POST',
+
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`
         },
+
         body: JSON.stringify({
+
           model: 'llama-3.3-70b-versatile',
-          max_tokens: 2000,
-          temperature: 0.3,
+
+          temperature: 0.1,
+
+          max_tokens: 1200,
+
           messages: [
-            { role: 'system', content: 'Tu es un expert SOC niveau 3. Génère des rapports professionnels en français.' },
-            { role: 'user', content: prompt }
+
+            {
+              role: 'system',
+              content: systemPrompt
+            },
+
+            {
+              role: 'user',
+              content: prompt
+            }
           ]
         })
-      });
+      }
+    );
 
-      const data = await resp.json();
-      const analysis = data.choices?.[0]?.message?.content || 'Erreur API';
+    // ============================================
+    // HTTP ERROR HANDLING
+    // ============================================
 
-      const now = new Date().toLocaleString('fr-FR');
-      reportText = `╔══════════════════════════════════════════════════════════╗
-║     RAPPORT SÉCURITÉ HONEYPOT — ${now}
-║     Période: ${hours}h — Source: Elasticsearch + Groq AI
+    if (!resp.ok) {
+
+      const errText =
+        await resp.text();
+
+      throw new Error(
+        `HTTP ${resp.status}\n${errText}`
+      );
+    }
+
+    // ============================================
+    // PARSE RESPONSE
+    // ============================================
+
+    const data = await resp.json();
+
+    console.log('GROQ RESPONSE:', data);
+
+    let analysis =
+      'Erreur génération rapport IA';
+
+    if (
+      data &&
+      data.choices &&
+      data.choices.length > 0 &&
+      data.choices[0].message &&
+      data.choices[0].message.content
+    ) {
+
+      analysis =
+        data.choices[0].message.content;
+    }
+
+    else if (data.error) {
+
+      analysis =
+        `Erreur API Groq:\n${data.error.message}`;
+    }
+
+    // ============================================
+    // FINAL REPORT
+    // ============================================
+
+    const now =
+      new Date().toLocaleString('fr-FR');
+
+    reportText = `
+╔══════════════════════════════════════════════════════════╗
+║        RAPPORT SOC HONEYPOT — ${now}
+║        Source: ELK + Suricata + Groq AI
 ╚══════════════════════════════════════════════════════════╝
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- 📊 STATISTIQUES
+📊 STATISTIQUES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- 🔵 COWRIE SSH
-    Connexions    : ${c.connections.length}
-    Login OK      : ${c.login_success.length}
-    Login KO      : ${c.login_failed.length}
-    Commandes     : ${c.commands.length}
-    IPs uniques   : ${c.ips.length}
 
- 🟠 DIONAEA
-    Connexions    : ${d.connections.length}
-    Protocoles    : ${Object.keys(d.protocols).join(', ') || 'Aucun'}
+🔵 COWRIE SSH
+   Connexions   : ${c.connections.length}
+   Login OK     : ${c.login_success.length}
+   Login KO     : ${c.login_failed.length}
+   Commandes    : ${c.commands.length}
+   IPs uniques  : ${c.ips.length}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- 🌐 IPs ATTACKANTES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-${c.ips.map(ip => '    • ' + ip).join('\n') || '    • Aucune'}
+🟠 DIONAEA
+   Connexions   : ${d.connections.length}
+   Protocoles   : ${Object.keys(d.protocols).join(', ')}
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- 🔑 CREDENTIALS ESSAYÉS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    Users     : ${c.usernames.slice(0,10).join(', ') || 'Aucun'}
-    Passwords : ${c.passwords.slice(0,10).join(', ') || 'Aucun'}
+🔴 SURICATA
+   Alertes IDS  : ${s.alerts.length}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- 💻 COMMANDES DÉTECTÉES
+🌐 IPs ATTACKANTES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-${c.commands.slice(0,20).map(x => '    • ' + x.input).join('\n') || '    • Aucune'}
+
+${c.ips
+  .slice(0, 20)
+  .map(ip => `• ${ip}`)
+  .join('\n')}
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
- 🤖 ANALYSE IA — Groq LLaMA 3.3 70B
+💻 TOP COMMANDES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+${sortedCommands
+  .map(([cmd, count]) =>
+    `• ${cmd} (${count})`)
+  .join('\n')}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🧠 ANALYSE IA SOC
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 ${analysis}
 
 ══════════════════════════════════════
- HoneypotAI v1.0 — Cowrie + Dionaea + ELK + Groq
-══════════════════════════════════════`;
+ HoneypotAI v2.0
+ Cowrie + Dionaea + Suricata + ELK + SOAR + Groq
+══════════════════════════════════════
+`;
 
-      document.getElementById('report-output').textContent = reportText;
+    // ============================================
+    // DISPLAY REPORT
+    // ============================================
 
-    } catch(err) {
-      document.getElementById('report-output').textContent = `Erreur API Groq: ${err.message}`;
-    }
+    document
+      .getElementById('report-output')
+      .textContent = reportText;
+
+  } catch(err) {
+
+    console.error(err);
+
+    document
+      .getElementById('report-output')
+      .textContent =
+      `Erreur API Groq:\n\n${err.message}`;
   }
 
-  document.getElementById('report-loading').classList.remove('show');
+  // ============================================
+  // STOP LOADING
+  // ============================================
+
+  document
+    .getElementById('report-loading')
+    .classList.remove('show');
 }
 
+
+// ═══════════════════════════════════════════════
+// DOWNLOAD REPORT
+// ═══════════════════════════════════════════════
+
 function downloadReport() {
-  if (!reportText) { alert('Générer un rapport d\'abord!'); return; }
-  const blob = new Blob([reportText], { type: 'text/plain;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+
+  if (!reportText) {
+
+    alert('Générer un rapport d\'abord!');
+    return;
+  }
+
+  const blob = new Blob(
+    [reportText],
+    {
+      type: 'text/plain;charset=utf-8'
+    }
+  );
+
+  const url =
+    URL.createObjectURL(blob);
+
+  const a =
+    document.createElement('a');
+
   a.href = url;
-  a.download = `honeypot_rapport_${new Date().toISOString().slice(0,10)}.txt`;
+
+  a.download =
+    `honeypot_rapport_${
+      new Date()
+        .toISOString()
+        .slice(0,10)
+    }.txt`;
+
   a.click();
+
   URL.revokeObjectURL(url);
 }
 
+
+// ═══════════════════════════════════════════════
+// CLEAR REPORT
+// ═══════════════════════════════════════════════
+
 function clearReport() {
+
   reportText = '';
-  document.getElementById('report-output').textContent = 'Rapport effacé.';
+
+  document
+    .getElementById('report-output')
+    .textContent =
+    'Rapport effacé.';
 }
 
+
 // ═══════════════════════════════════════════════
-// UTILS
+// FORMAT TIME
 // ═══════════════════════════════════════════════
+
 function formatTime(ts) {
-  if (!ts) return '—';
-  try { return new Date(ts).toLocaleTimeString('fr-FR'); }
-  catch { return ts.substring(11,19); }
-}
-//==================================
 
+  if (!ts)
+    return '—';
+
+  try {
+
+    return new Date(ts)
+      .toLocaleTimeString('fr-FR');
+
+  } catch {
+
+    return ts.substring(11,19);
+  }
+}
 
 
 

@@ -4,6 +4,8 @@ import numpy as np
 import tensorflow as tf
 import pickle, os
 import warnings
+import subprocess
+
 warnings.filterwarnings('ignore')
 
 app = Flask(__name__)
@@ -78,3 +80,45 @@ def predict_batch():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5005, debug=False, threaded=True)
+
+
+@app.route("/block_ip", methods=["POST"])
+def block_ip():
+
+    data = request.json
+    ip = data.get("ip")
+
+    if not ip:
+        return jsonify({
+            "status": "error",
+            "message": "missing ip"
+        })
+
+    try:
+
+        # Linux iptables
+        subprocess.run([
+            "sudo",
+            "iptables",
+            "-A",
+            "INPUT",
+            "-s",
+            ip,
+            "-j",
+            "DROP"
+        ])
+
+        return jsonify({
+            "status": "success",
+            "ip": ip
+        })
+
+    except Exception as e:
+
+        return jsonify({
+            "status": "error",
+            "message": str(e)
+        })
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5005)
